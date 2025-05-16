@@ -107,11 +107,17 @@ const KanbanBoard = ({ tasks, onTaskMove, onEditTask, onDeleteTask, onStatusChan
               <span className="kanban-column-badge">{tasksByStatus[column.id].length}</span>
             </div>
             
+            {/* 
+              Note: react-beautiful-dnd uses defaultProps which shows a warning in React 18.
+              This is a library limitation and can be ignored until the library is updated.
+              Warning: Connect(Droppable): Support for defaultProps will be removed from memo components
+              in a future major release. Use JavaScript default parameters instead.
+            */}
             <Droppable droppableId={column.id}>
               {(provided, snapshot) => (
                 <div
                   className={`kanban-task-list ${snapshot.isDraggingOver ? 'bg-surface-200/50 dark:bg-surface-700/30 rounded-lg' : ''}`}
-                  ref={provided.innerRef}
+                  ref={provided?.innerRef}
                   {...provided.droppableProps}
                 >
                   {tasksByStatus[column.id].length === 0 && !snapshot.isDraggingOver && (
@@ -122,11 +128,11 @@ const KanbanBoard = ({ tasks, onTaskMove, onEditTask, onDeleteTask, onStatusChan
                   
                   {tasksByStatus[column.id].map((task, index) => (
                     <Draggable key={task.id} draggableId={task.id} index={index}>
-                      {(provided, snapshot) => (
+                      {(dragProvided, dragSnapshot) => (
                         <div
-                          ref={provided.innerRef}
-                          {...provided.draggableProps}
-                          {...provided.dragHandleProps}
+                          ref={dragProvided?.innerRef}
+                          {...dragProvided.draggableProps}
+                          {...dragProvided.dragHandleProps}
                           className={`kanban-task-item ${getPriorityClass(task.priority)} ${
                             snapshot.isDragging ? 'is-dragging' : ''
                           }`}
