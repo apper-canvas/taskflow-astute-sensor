@@ -195,9 +195,9 @@ export const deleteTask = (taskId) => async (dispatch) => {
     });
 
     // Ensure taskId is in the right format
-    const idToDelete = typeof taskId === 'string' && !isNaN(parseInt(taskId)) 
-      ? parseInt(taskId) 
-      : taskId;
+    // Convert string IDs to numbers if they're numeric strings
+    const idToDelete = typeof taskId === 'string' && !isNaN(Number(taskId))
+      ? Number(taskId) : taskId;
     
     const params = {
       RecordIds: [idToDelete]
