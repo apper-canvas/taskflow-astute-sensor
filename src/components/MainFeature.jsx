@@ -71,7 +71,6 @@ const MainFeature = () => {
   // Handle adding new task with database
   const handleAddTask = async (e) => {
     e.preventDefault();
-    e.preventDefault();
     
     // Validate form
     const validationErrors = validateTask(newTask);
@@ -113,6 +112,28 @@ const MainFeature = () => {
     });
   };
 
+  // Handle editing a task (sets the editing state)
+  const handleEditTask = (task) => {
+    setEditingTask({
+      ...task,
+      dueDate: task.dueDate && task.dueDate.split('T')[0] // Ensure date format is yyyy-MM-dd
+    });
+  };
+  
+  // Handle updating a task with the database
+  const handleUpdateTask = async (e) => {
+    e.preventDefault();
+    
+    // Validate form
+    const validationErrors = validateTask(editingTask);
+    if (Object.keys(validationErrors).length > 0) {
+      setErrors(validationErrors);
+      return;
+    }
+    
+    // Clear previous errors
+    setErrors({});
+
     try {
       setIsSubmitting(true);
       
@@ -129,39 +150,24 @@ const MainFeature = () => {
     } finally {
       setIsSubmitting(false);
     }
-    });
   };
-  // Handle updating a task with database
-  const handleUpdateTask = async (e) => {
-    e.preventDefault();
-    
-    // Validate form
-    const validationErrors = validateTask(editingTask);
-    if (Object.keys(validationErrors).length > 0) {
-      setErrors(validationErrors);
-      return;
+  
+  // Handle deleting a task
+  const handleDeleteTask = async (taskId) => {
+    try {
+      const { deleteTask } = await import('../services/taskService');
+      await dispatch(deleteTask(taskId));
+      toast.success('Task deleted successfully!');
+    } catch (error) {
+      console.error('Error deleting task:', error);
+      toast.error(error.message || 'Failed to delete task');
     }
-    
-    // Clear previous errors
-    setErrors({});
-    
-    setTasks(prev => 
-      prev.map(task => 
-        task.id === editingTask.id ? { ...editingTask, updatedAt: new Date().toISOString() } : task
-      )
-    );
-    
-    setEditingTask(null);
-    toast.success('Task updated successfully!');
   };
 
   // Handle changing task status
   const handleStatusChange = (id, newStatus) => {
-    setTasks(prev => 
-      prev.map(task => 
-        task.id === id ? { ...task, status: newStatus, updatedAt: new Date().toISOString() } : task
-      )
-    );
+    // Update task status in redux via the proper action
+    dispatch(moveTask({ taskId: id, newStatus }));
     toast.info(`Task marked as ${newStatus}`);
   };
   
