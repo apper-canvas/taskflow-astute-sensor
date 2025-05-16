@@ -228,18 +228,7 @@ export const deleteTask = (taskId) => async (dispatch) => {
  */
 export const moveTaskAction = ({ taskId, newStatus }) => async (dispatch, getState) => {
   try {
-    dispatch(setLoading(true));
-
-    // Immediately update Redux state to reflect UI change
-    dispatch(moveTask({ taskId, newStatus }));
-    
-    const { ApperClient } = window.ApperSDK;
-    const apperClient = new ApperClient({
-      apperProjectId: import.meta.env.VITE_APPER_PROJECT_ID,
-      apperPublicKey: import.meta.env.VITE_APPER_PUBLIC_KEY
-    });
-    
-    // Get the task from current Redux state
+    // Get the task from current Redux state before any updates
     const state = getState();
     const task = state.tasks.tasks.find(t => (t.Id || t.id) === taskId);
     
@@ -247,15 +236,44 @@ export const moveTaskAction = ({ taskId, newStatus }) => async (dispatch, getSta
       throw new Error("Task not found in current state");
     }
     
-    // Prepare data for update
-    const taskIdForQuery = typeof taskId === 'string' && !isNaN(parseInt(taskId)) 
-      ? parseInt(taskId) 
-      : taskId;
+    // Step 1: Immediately update Redux state to provide responsive UI
+    dispatch(moveTask({ taskId, newStatus }));
+
+    // Step 2: Make direct API call without dispatching another action
+    const { ApperClient } = window.ApperSDK;
+    const apperClient = new ApperClient({
+      apperProjectId: import.meta.env.VITE_APPER_PROJECT_ID,
+      apperPublicKey: import.meta.env.VITE_APPER_PUBLIC_KEY
+    });
     
-    // Update the task with new status in database
-    await dispatch(updateTaskById({...task, status: newStatus}));
+    // Prepare update data - only include the fields we're changing
+    const updateData = {
+      Id: task.Id || task.id,
+      status: newStatus
+    };
+    
+    const params = {
+      records: [updateData]
+    };
+    
+    // Make the API call directly
+    const response = await apperClient.updateRecord(TABLE_NAME, params);
+    
+    if (!response.success) {
+      throw new Error("Failed to update task status in database");
+    }
+    
+    // No need to update Redux again as we already did it
+    return true;
   } catch (error) {
+    // If the API call fails, revert the task status in Redux
+    if (task) {
+      // Revert the UI state by dispatching an update with the original status
+      dispatch(moveTask({ taskId, newStatus: task.status }));
+    }
+    
     console.error("Error moving task:", error);
     dispatch(setError(error.message || "Failed to move task"));
+    return false;
   }
 };
