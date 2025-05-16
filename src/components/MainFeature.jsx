@@ -111,11 +111,15 @@ const MainFeature = () => {
   };
 
   // Handle editing a task (sets the editing state)
-  const handleEditTask = (task) => {
-    setEditingTask({
-      ...task,
+  const handleEditTask = (task, inline = false) => {
+    const taskToEdit = {
+      ...task, 
+      inline: inline, // Add a flag to indicate inline editing
+      Id: task.Id || task.id, // Ensure we have the ID in the right format
+      id: task.Id || task.id, // Ensure we have the ID in the right format
       dueDate: task.dueDate && task.dueDate.split('T')[0] // Ensure date format is yyyy-MM-dd
-    });
+    };
+    setEditingTask(taskToEdit);
   };
   
   // Handle updating a task with the database
@@ -135,6 +139,7 @@ const MainFeature = () => {
     try {
       setIsSubmitting(true);
       setEditingTask(null);
+      await dispatch(updateTaskById(editingTask));
       toast.success('Task updated successfully!');
     } catch (error) {
       console.error('Error updating task:', error);
@@ -249,6 +254,83 @@ const MainFeature = () => {
         {priority.charAt(0).toUpperCase() + priority.slice(1)}
       </span>
     );
+  };
+
+  const StatusBadge = ({ status }) => {
+    const bgColors = {
+      'Not Started': 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200',
+      'In Progress': 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200',
+      'On Hold': 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200',
+      'Completed': 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
+    };
+    
+    return (
+      <span className={`text-xs px-2 py-1 rounded-full font-medium ${bgColors[status]}`}>
+        {status}
+      </span>
+    );
+  };
+
+  // Inline edit components
+  const InlineEditField = ({ type, name, value, onChange, options = [], className = '', error = null }) => {
+    switch (type) {
+      case 'text':
+        return (
+          <div className={className}>
+            <input
+              type="text"
+              name={name}
+              value={value || ''}
+              onChange={onChange}
+              className={`input py-1 ${error ? 'border-red-500' : ''}`}
+            />
+            {error && <p className="text-xs text-red-500">{error}</p>}
+          </div>
+        );
+      case 'textarea':
+        return (
+          <div className={className}>
+            <textarea
+              name={name}
+              value={value || ''}
+              onChange={onChange}
+              className={`input py-1 min-h-[60px] ${error ? 'border-red-500' : ''}`}
+            ></textarea>
+          </div>
+        );
+      case 'date':
+        return (
+          <div className={className}>
+            <input
+              type="date"
+              name={name}
+              value={value || ''}
+              onChange={onChange}
+              className={`input py-1 ${error ? 'border-red-500' : ''}`}
+            />
+            {error && <p className="text-xs text-red-500">{error}</p>}
+          </div>
+        );
+      case 'select':
+        return (
+          <div className={className}>
+            <select
+              name={name}
+              value={value || ''}
+              onChange={onChange}
+              className={`input py-1 ${error ? 'border-red-500' : ''}`}
+            >
+              {options.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </div>
+        );
+      default:
+        return null;
+    }
   };
 
   const StatusBadge = ({ status }) => {
@@ -590,7 +672,8 @@ const MainFeature = () => {
                   transition={{ duration: 0.3 }}
                   className={`task-item ${getPriorityClass(task.priority)} ${task.status === 'Completed' ? 'opacity-70' : ''}`}
                 >
-                  {editingTask && editingTask.id === task.id ? (
+                  {editingTask && editingTask.id === task.id && !editingTask.inline ? (
+                    // Full form edit mode (original implementation)
                     <form onSubmit={handleUpdateTask} className="space-y-4">
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
@@ -708,7 +791,90 @@ const MainFeature = () => {
                         </button>
                       </div>
                     </form>
+                  ) : editingTask && editingTask.id === task.id && editingTask.inline ? (
+                    // Inline editing mode (new implementation)
+                    <div>
+                      {/* Inline title edit */}
+                      <div className="mb-2">
+                        <InlineEditField 
+                          type="text"
+                          name="title"
+                          value={editingTask.title}
+                          onChange={(e) => handleInputChange(e, 'edit')}
+                          error={errors.title}
+                          className="mb-2"
+                        />
+                      </div>
+                      
+                      {/* Inline description edit */}
+                      <InlineEditField 
+                        type="textarea"
+                        name="description"
+                        value={editingTask.description}
+                        onChange={(e) => handleInputChange(e, 'edit')}
+                        className="mb-3"
+                      />
+                      
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 mb-3">
+                        {/* Inline priority edit */}
+                        <InlineEditField 
+                          type="select"
+                          name="priority"
+                          value={editingTask.priority}
+                          onChange={(e) => handleInputChange(e, 'edit')}
+                          options={[
+                            { value: 'low', label: 'Low' },
+                            { value: 'medium', label: 'Medium' },
+                            { value: 'high', label: 'High' },
+                            { value: 'critical', label: 'Critical' }
+                          ]}
+                        />
+                        
+                        {/* Inline status edit */}
+                        <InlineEditField 
+                          type="select"
+                          name="status"
+                          value={editingTask.status}
+                          onChange={(e) => handleInputChange(e, 'edit')}
+                          options={[
+                            { value: 'Not Started', label: 'Not Started' },
+                            { value: 'In Progress', label: 'In Progress' },
+                            { value: 'On Hold', label: 'On Hold' },
+                            { value: 'Completed', label: 'Completed' }
+                          ]}
+                        />
+                        
+                        {/* Inline date edit */}
+                        <InlineEditField 
+                          type="date"
+                          name="dueDate"
+                          value={editingTask.dueDate}
+                          onChange={(e) => handleInputChange(e, 'edit')}
+                          error={errors.dueDate}
+                        />
+                      </div>
+                      
+                      <div className="flex justify-end gap-2 mt-3">
+                        <button 
+                          type="button" 
+                          onClick={() => setEditingTask(null)}
+                          className="btn btn-outline flex items-center gap-1 py-1 px-2 text-sm"
+                        >
+                          <XIcon className="h-3 w-3" />
+                          <span>Cancel</span>
+                        </button>
+                        <button 
+                          type="button" 
+                          onClick={handleUpdateTask}
+                          className="btn btn-primary flex items-center gap-1 py-1 px-2 text-sm"
+                        >
+                          <CheckIcon className="h-3 w-3" />
+                          <span>Save</span>
+                        </button>
+                      </div>
+                    </div>
                   ) : (
+                    // Normal view mode (not editing)
                     <div>
                       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-2">
                         <h4 className={`font-bold text-lg ${task.status === 'Completed' ? 'line-through text-surface-500 dark:text-surface-400' : 'text-surface-800 dark:text-surface-50'}`}>
@@ -757,7 +923,7 @@ const MainFeature = () => {
                           <button 
                             onClick={() => handleEditTask(task)}
                             className="p-1.5 text-surface-600 hover:text-surface-800 dark:text-surface-400 dark:hover:text-surface-200 hover:bg-surface-200 dark:hover:bg-surface-700 rounded-full transition-colors"
-                            aria-label="Edit task"
+                            onClick={() => handleEditTask(task, true)} {/* Pass true for inline editing */}
                           >
                             <EditIcon className="h-4 w-4" />
                           </button>
