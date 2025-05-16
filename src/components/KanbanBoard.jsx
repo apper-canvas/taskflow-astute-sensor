@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { DragDropContext, Droppable, Draggable } from 'react-beautiful-dnd';
 import { format } from 'date-fns';
 import { getIcon } from '../utils/iconUtils';
@@ -105,6 +105,12 @@ const KanbanBoard = ({ tasks, onTaskMove, onEditTask, onDeleteTask, onStatusChan
   
   // Generate tasks grouped by status
   const tasksByStatus = getTasksByStatus();
+  
+  // Refresh the task groups when tasks change
+  useEffect(() => {
+    // Ensure component re-renders when tasks change
+    getTasksByStatus();
+  }, [tasks]);
   
   return (
     <DragDropContext onDragEnd={handleDragEnd}>

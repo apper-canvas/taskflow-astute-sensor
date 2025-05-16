@@ -226,45 +226,36 @@ export const deleteTask = (taskId) => async (dispatch) => {
  * @param {number|string} params.taskId - The ID of the task to move
  * @param {string} params.newStatus - The new status for the task
  */
-export const moveTaskAction = ({ taskId, newStatus }) => async (dispatch) => {
+export const moveTaskAction = ({ taskId, newStatus }) => async (dispatch, getState) => {
   try {
     dispatch(setLoading(true));
+
+    // Immediately update Redux state to reflect UI change
+    dispatch(moveTask({ taskId, newStatus }));
     
     const { ApperClient } = window.ApperSDK;
     const apperClient = new ApperClient({
       apperProjectId: import.meta.env.VITE_APPER_PROJECT_ID,
       apperPublicKey: import.meta.env.VITE_APPER_PUBLIC_KEY
     });
-
-    // Prepare the ID for database query
+    
+    // Get the task from current Redux state
+    const state = getState();
+    const task = state.tasks.tasks.find(t => (t.Id || t.id) === taskId);
+    
+    if (!task) {
+      throw new Error("Task not found in current state");
+    }
+    
+    // Prepare data for update
     const taskIdForQuery = typeof taskId === 'string' && !isNaN(parseInt(taskId)) 
       ? parseInt(taskId) 
       : taskId;
     
-    // First fetch the task to get its current data
-    const fetchParams = {
-      fields: TASK_FIELDS,
-      where: [
-        {
-          fieldName: "Id",
-          operator: "ExactMatch",
-          values: [taskIdForQuery]
-        }
-      ]
-    };
-    
-    const fetchResponse = await apperClient.fetchRecords(TABLE_NAME, fetchParams);
-    
-    if (!fetchResponse || !fetchResponse.data || fetchResponse.data.length === 0) {
-      throw new Error("Task not found");
-    }
-    
-    const taskToUpdate = fetchResponse.data[0];
-    await dispatch(updateTaskById({...taskToUpdate, status: newStatus}));
-    dispatch(moveTask({taskId: taskIdForQuery, newStatus}));
+    // Update the task with new status in database
+    await dispatch(updateTaskById({...task, status: newStatus}));
   } catch (error) {
     console.error("Error moving task:", error);
     dispatch(setError(error.message || "Failed to move task"));
-    throw error;
   }
 };
