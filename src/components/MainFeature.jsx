@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { format } from 'date-fns';
 import { toast } from 'react-toastify';
 import { getIcon } from '../utils/iconUtils';
+import KanbanBoard from './KanbanBoard';
 
 const MainFeature = () => {
   // Get icons as components
@@ -15,6 +16,9 @@ const MainFeature = () => {
   const ChevronDownIcon = getIcon('ChevronDown');
   const ChevronUpIcon = getIcon('ChevronUp');
   const CalendarIcon = getIcon('Calendar');
+  const LayoutIcon = getIcon('Layout');
+  const ListIcon = getIcon('List');
+  const LayoutKanbanIcon = getIcon('Trello');
 
   // Loading saved tasks from localStorage
   const getSavedTasks = () => {
@@ -35,6 +39,7 @@ const MainFeature = () => {
   const [filter, setFilter] = useState('all');
   const [sort, setSort] = useState('dueDate');
   const [isFilterExpanded, setIsFilterExpanded] = useState(false);
+  const [viewMode, setViewMode] = useState('list'); // 'list' or 'kanban'
 
   // Handle validation errors
   const [errors, setErrors] = useState({});
@@ -134,7 +139,22 @@ const MainFeature = () => {
     );
     toast.info(`Task marked as ${newStatus}`);
   };
-
+  
+  // Handle task movement in kanban board
+  const handleTaskMove = (taskId, newStatus) => {
+    // Find task to update
+    const taskToUpdate = tasks.find(t => t.id === taskId);
+    
+    if (taskToUpdate && taskToUpdate.status !== newStatus) {
+      setTasks(prev => 
+        prev.map(task => 
+          task.id === taskId ? { ...task, status: newStatus, updatedAt: new Date().toISOString() } : task
+        )
+      );
+      toast.info(`Task moved to ${newStatus}`);
+    }
+  };
+  
   // Filter tasks based on the selected filter
   const getFilteredTasks = () => {
     let filtered = [...tasks];
@@ -245,6 +265,35 @@ const MainFeature = () => {
 
   return (
     <div className="bg-surface-50 dark:bg-surface-900 rounded-xl p-4 md:p-6 lg:p-8 shadow-neu-light dark:shadow-neu-dark">
+      <div className="mb-6">
+        <h2 className="text-2xl md:text-3xl font-bold mb-4 text-surface-800 dark:text-surface-50">Task Manager</h2>
+        
+        {/* View Toggle */}
+        <div className="flex justify-end mb-4">
+          <div className="inline-flex rounded-md shadow-sm" role="group">
+            <button
+              onClick={() => setViewMode('list')}
+              className={`px-4 py-2 text-sm font-medium rounded-l-lg flex items-center gap-2 ${
+                viewMode === 'list' 
+                  ? 'bg-primary text-white' 
+                  : 'bg-white dark:bg-surface-800 text-surface-600 dark:text-surface-300 hover:bg-surface-100 dark:hover:bg-surface-700'
+              }`}
+            >
+              <ListIcon className="h-4 w-4" /> List View
+            </button>
+            <button
+              onClick={() => setViewMode('kanban')}
+              className={`px-4 py-2 text-sm font-medium rounded-r-lg flex items-center gap-2 ${
+                viewMode === 'kanban' 
+                  ? 'bg-primary text-white' 
+                  : 'bg-white dark:bg-surface-800 text-surface-600 dark:text-surface-300 hover:bg-surface-100 dark:hover:bg-surface-700'
+              }`}
+            >
+              <LayoutKanbanIcon className="h-4 w-4" /> Kanban Board
+            </button>
+          </div>
+        </div>
+        
       <div className="mb-6">
         <h2 className="text-2xl md:text-3xl font-bold mb-4 text-surface-800 dark:text-surface-50">Task Manager</h2>
         
@@ -400,7 +449,8 @@ const MainFeature = () => {
         </form>
         
         {/* Task List Container */}
-        <div>
+        {viewMode === 'list' ? (
+          <div>
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 gap-4">
             <h3 className="text-xl font-bold text-surface-800 dark:text-surface-50">Your Tasks</h3>
             
@@ -674,6 +724,14 @@ const MainFeature = () => {
               ))
             )}
           </div>
+        </div>
+        ) : (
+          <div>
+            <h3 className="text-xl font-bold mb-4 text-surface-800 dark:text-surface-50">Kanban Board</h3>
+            <KanbanBoard tasks={tasks} onTaskMove={handleTaskMove} onEditTask={handleEditTask} 
+              onDeleteTask={handleDeleteTask} onStatusChange={handleStatusChange} />
+          </div>
+        )}
         </div>
       </div>
     </div>

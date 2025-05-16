@@ -83,6 +83,56 @@
   .task-item-critical {
     @apply border-red-500;
   }
+  
+  /* Kanban Board styles */
+  .kanban-container {
+    @apply grid grid-cols-1 md:grid-cols-4 gap-4 min-h-[60vh] w-full;
+  }
+  
+  .kanban-column {
+    @apply bg-surface-100 dark:bg-surface-800 rounded-lg p-3 flex flex-col min-h-[300px];
+  }
+  
+  .kanban-column-header {
+    @apply text-sm font-bold mb-3 pb-2 border-b border-surface-200 dark:border-surface-700 flex items-center justify-between;
+  }
+  
+  .column-not-started {
+    @apply bg-surface-100/70 dark:bg-surface-800/70;
+  }
+  
+  .column-in-progress {
+    @apply bg-blue-50/70 dark:bg-blue-900/20;
+  }
+  
+  .column-on-hold {
+    @apply bg-purple-50/70 dark:bg-purple-900/20;
+  }
+  
+  .column-completed {
+    @apply bg-green-50/70 dark:bg-green-900/20;
+  }
+  
+  .kanban-task-list {
+    @apply flex-1 overflow-y-auto max-h-[calc(100vh-300px)] scrollbar-hide;
+  }
+  
+  .kanban-task-item {
+    @apply task-item mb-2 cursor-grab active:cursor-grabbing;
+  }
+  
+  .kanban-task-item.is-dragging {
+    @apply shadow-lg opacity-80 rotate-1 scale-105;
+  }
+  
+  .kanban-column-badge {
+    @apply inline-flex items-center justify-center text-xs text-surface-600 dark:text-surface-400 bg-surface-200 dark:bg-surface-700 rounded-full h-5 min-w-5 px-1.5;
+  }
+  
+  .kanban-placeholder {
+    @apply border-2 border-dashed border-surface-300 dark:border-surface-600 rounded-lg bg-surface-100/50 dark:bg-surface-800/50 h-20 mb-2;
+  }
+  
 }
 
 @layer utilities {
