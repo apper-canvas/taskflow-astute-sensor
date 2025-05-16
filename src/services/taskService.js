@@ -207,3 +207,48 @@ export const deleteTask = (taskId) => async (dispatch) => {
     throw error;
   }
 };
+
+/**
+ * Moves a task to a new status in the database
+ * @param {number|string} taskId - The ID of the task to move
+ * @param {string} newStatus - The new status for the task
+ */
+export const moveTaskAction = (taskId, newStatus) => async (dispatch) => {
+  try {
+    dispatch(setLoading(true));
+    
+    const { ApperClient } = window.ApperSDK;
+    const apperClient = new ApperClient({
+      apperProjectId: import.meta.env.VITE_APPER_PROJECT_ID,
+      apperPublicKey: import.meta.env.VITE_APPER_PUBLIC_KEY
+    });
+    
+    // First fetch the task to get its current data
+    const fetchParams = {
+      fields: TASK_FIELDS,
+      where: [
+        {
+          fieldName: "Id",
+          Operator: "ExactMatch",
+          values: [taskId]
+        }
+      ]
+    };
+    
+    const fetchResponse = await apperClient.fetchRecords(TABLE_NAME, fetchParams);
+    
+    if (fetchResponse && fetchResponse.data && fetchResponse.data.length > 0) {
+      const taskToUpdate = fetchResponse.data[0];
+      
+      // Update the task with the new status
+      await dispatch(updateTaskById({...taskToUpdate, status: newStatus}));
+      
+      // Also update the local state for immediate UI feedback
+      dispatch(moveTask({taskId: parseInt(taskId), newStatus}));
+    }
+  } catch (error) {
+    console.error("Error moving task:", error);
+    dispatch(setError(error.message || "Failed to move task"));
+    throw error;
+  }
+};
