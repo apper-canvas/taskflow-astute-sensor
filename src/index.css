@@ -93,6 +93,14 @@
     @apply bg-surface-100 dark:bg-surface-800 rounded-lg p-3 flex flex-col min-h-[300px];
   }
   
+  .column-drag-over {
+    @apply shadow-lg ring-2 ring-primary/50 dark:ring-primary/70 scale-[1.02] transition-all duration-200;
+  }
+  
+  .column-is-dragging-over {
+    @apply bg-surface-200/70 dark:bg-surface-700/40 transition-colors duration-300;
+  }
+  
   .kanban-column-header {
     @apply text-sm font-bold mb-3 pb-2 border-b border-surface-200 dark:border-surface-700 flex items-center justify-between;
   }
@@ -118,11 +126,15 @@
   }
   
   .kanban-task-item {
-    @apply task-item mb-2 cursor-grab active:cursor-grabbing;
+    @apply task-item mb-2 cursor-grab active:cursor-grabbing transition-all duration-200 ease-in-out hover:translate-y-[-2px] hover:shadow-md;
   }
   
   .kanban-task-item.is-dragging {
-    @apply shadow-lg opacity-80 rotate-1 scale-105;
+    @apply shadow-xl z-50 opacity-90 scale-[1.03] !cursor-grabbing;
+    transform-origin: center;
+    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+    transition: transform 0.12s ease-in-out, box-shadow 0.12s ease-in-out;
+    transition-property: transform, box-shadow, opacity;
   }
   
   .kanban-column-badge {
@@ -130,9 +142,18 @@
   }
   
   .kanban-placeholder {
-    @apply border-2 border-dashed border-surface-300 dark:border-surface-600 rounded-lg bg-surface-100/50 dark:bg-surface-800/50 h-20 mb-2;
+    @apply border-2 border-dashed border-surface-300 dark:border-surface-600 rounded-lg bg-surface-100/50 dark:bg-surface-800/50 h-20 mb-2 transition-all duration-200;
   }
   
+  .placeholder-drag-over {
+    @apply border-primary/60 dark:border-primary/70 bg-primary/5 dark:bg-primary/10 border-2 shadow-inner;
+  }
+  
+  /* Global dragging styles */
+  body.dragging-active {
+    @apply cursor-grabbing;
+    user-select: none;
+  }
 }
 
 @layer utilities {

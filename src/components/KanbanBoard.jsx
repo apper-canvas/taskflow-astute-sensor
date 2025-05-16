@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { DragDropContext, Droppable, Draggable } from 'react-beautiful-dnd';
+import { DragDropContext, Droppable, Draggable, resetServerContext } from 'react-beautiful-dnd';
 import { format } from 'date-fns';
 import { getIcon } from '../utils/iconUtils';
 
@@ -16,6 +16,22 @@ const KanbanBoard = ({ tasks, onTaskMove, onEditTask, onDeleteTask, onPriorityCh
     { id: 'on-hold', title: 'On Hold', status: 'On Hold', className: 'column-on-hold' },
     { id: 'completed', title: 'Completed', status: 'Completed', className: 'column-completed' }
   ];
+  
+  // Reset server context to prevent issues in SSR environments
+  try {
+    resetServerContext();
+  } catch (err) {
+    // Ignore error if not in SSR environment
+  }
+  
+  // State to track which column is currently being dragged over
+  const [draggedOverColumn, setDraggedOverColumn] = useState(null);
+  
+  // Handle drag start to set visual styles
+  const handleDragStart = () => {
+    // Add a class to the body to indicate dragging is in progress
+    document.body.classList.add('dragging-active');
+  };
 
   // Handle getting tasks for a specific column
   const getTasksForColumn = (columnStatus) => {
@@ -23,8 +39,12 @@ const KanbanBoard = ({ tasks, onTaskMove, onEditTask, onDeleteTask, onPriorityCh
   };
 
   // Handle drag end - the key function that was missing/broken
-  const handleDragEnd = (result) => {
+  const handleDragEnd = result => {
     const { destination, source, draggableId } = result;
+
+    // Remove dragging classes when the drag ends
+    document.body.classList.remove('dragging-active');
+    setDraggedOverColumn(null);
 
     // If there's no destination or the item was dropped back in the same place
     if (!destination || 
@@ -37,18 +57,28 @@ const KanbanBoard = ({ tasks, onTaskMove, onEditTask, onDeleteTask, onPriorityCh
     const targetColumn = columns.find(col => col.id === destination.droppableId);
     if (!targetColumn) return;
 
-    // Parse the taskId to ensure it's consistent
-    // This step is critical as it resolves ID inconsistency issues
+    // Extract and normalize the task ID
     let taskId = draggableId;
     if (taskId.startsWith('task-')) {
       taskId = taskId.replace('task-', '');
     }
     
-    // Convert to number if it's a numeric string
-    const parsedTaskId = !isNaN(Number(taskId)) ? Number(taskId) : taskId;
+    // Always try to convert to number first for consistency
+    const parsedTaskId = !isNaN(parseInt(taskId)) ? parseInt(taskId) : taskId;
     
-    // Call the handler with the parsed ID and new status
+    // Call the move handler with normalized ID
     onTaskMove(parsedTaskId, targetColumn.status);
+  };
+  
+  // Handle drag update to track which column is being dragged over
+  const handleDragUpdate = (update) => {
+    if (!update.destination) {
+      setDraggedOverColumn(null);
+      return;
+    }
+    
+    // Update state with current column being dragged over
+    setDraggedOverColumn(update.destination.droppableId);
   };
 
   // Determine task priority class
@@ -79,10 +109,10 @@ const KanbanBoard = ({ tasks, onTaskMove, onEditTask, onDeleteTask, onPriorityCh
   };
 
   return (
-    <DragDropContext onDragEnd={handleDragEnd}>
+    <DragDropContext onDragStart={handleDragStart} onDragUpdate={handleDragUpdate} onDragEnd={handleDragEnd}>
       <div className="kanban-container">
         {columns.map(column => (
-          <div key={column.id} className={`kanban-column ${column.className}`}>
+          <div key={column.id} className={`kanban-column ${column.className} ${draggedOverColumn === column.id ? 'column-drag-over' : ''}`}>
             <div className="kanban-column-header">
               <span>{column.title}</span>
               <span className="kanban-column-badge">
@@ -90,25 +120,32 @@ const KanbanBoard = ({ tasks, onTaskMove, onEditTask, onDeleteTask, onPriorityCh
               </span>
             </div>
             
-            <Droppable droppableId={column.id}>
+            <Droppable droppableId={column.id} type="TASK">
               {(provided, snapshot) => (
                 <div
                   ref={provided.innerRef}
                   {...provided.droppableProps}
-                  className={`kanban-task-list ${snapshot.isDraggingOver ? 'bg-surface-200/50 dark:bg-surface-700/30' : ''}`}
+                  className={`kanban-task-list ${snapshot.isDraggingOver ? 'column-is-dragging-over' : ''}`}
                 >
                   {getTasksForColumn(column.status).map((task, index) => (
                     <Draggable 
                       key={`task-${task.Id || task.id}`} 
-                      draggableId={`task-${task.Id || task.id}`} 
+                      draggableId={`task-${task.Id || task.id}`}
                       index={index}
                     >
                       {(provided, snapshot) => (
                         <div
-                          ref={provided.innerRef}
+                          className={`kanban-task-item ${getPriorityClass(task.priority)} ${snapshot.isDragging ? 'is-dragging' : ''}`}
                           {...provided.draggableProps}
                           {...provided.dragHandleProps}
-                          className={`kanban-task-item ${getPriorityClass(task.priority)} ${snapshot.isDragging ? 'is-dragging' : ''}`}
+                          ref={provided.innerRef}
+                          style={{
+                            ...provided.draggableProps.style,
+                            // Add subtle rotation when dragging like Trello
+                            transform: snapshot.isDragging 
+                              ? `${provided.draggableProps.style.transform} rotate(${Math.random() > 0.5 ? 2 : -2}deg)` 
+                              : provided.draggableProps.style.transform
+                          }}
                         >
                           <div className="flex flex-col gap-2">
                             <div className="flex justify-between items-start">
@@ -155,7 +192,7 @@ const KanbanBoard = ({ tasks, onTaskMove, onEditTask, onDeleteTask, onPriorityCh
                   
                   {/* Empty state indicator */}
                   {getTasksForColumn(column.status).length === 0 && (
-                    <div className="kanban-placeholder flex items-center justify-center">
+                    <div className={`kanban-placeholder flex items-center justify-center ${snapshot.isDraggingOver ? 'placeholder-drag-over' : ''}`}>
                       <span className="text-xs text-surface-400 dark:text-surface-500">
                         No tasks
                       </span>
