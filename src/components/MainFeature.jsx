@@ -27,6 +27,7 @@ const MainFeature = () => {
   const ListIcon = getIcon('List');
   const LayoutKanbanIcon = getIcon('Trello');
   const LoaderIcon = getIcon('Loader');
+  const ArrowDownIcon = getIcon('ChevronDown');
 
   // State for tasks
   const [localTasks, setLocalTasks] = useState([]);
@@ -182,6 +183,26 @@ const MainFeature = () => {
       toast.error(error.message || `Failed to update task status to ${newStatus}`);
     }
   };
+
+  // Handle changing task priority
+  const handlePriorityChange = async (id, newPriority) => {
+    try {
+      // Find the task to update
+      const taskToUpdate = localTasks.find(task => (task.Id || task.id) === id);
+      
+      if (taskToUpdate) {
+        // Prepare the updated task data
+        const updatedTask = {
+          ...taskToUpdate,
+          priority: newPriority
+        };
+        await dispatch(updateTaskById(updatedTask));
+        toast.info(`Task priority changed to ${newPriority}`);
+      }
+    } catch (error) {
+      toast.error(error.message || `Failed to update task priority to ${newPriority}`);
+    }
+  };
   
   // Handle task movement in kanban board
   const handleTaskMove = (taskId, newStatus) => {
@@ -272,6 +293,95 @@ const MainFeature = () => {
   };
 
   // Inline edit components
+  const PrioritySelector = ({ task, onSelect }) => {
+    const [isOpen, setIsOpen] = useState(false);
+    
+    const priorityColors = {
+      low: 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200',
+      medium: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200',
+      high: 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200',
+      critical: 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
+    };
+    
+    return (
+      <div className="relative inline-block text-left">
+        <button 
+          type="button" 
+          onClick={() => setIsOpen(!isOpen)}
+          className={`text-xs px-2 py-1 rounded-full font-medium flex items-center gap-1 ${priorityColors[task.priority]}`}
+        >
+          {task.priority.charAt(0).toUpperCase() + task.priority.slice(1)}
+          <ArrowDownIcon className="h-3 w-3" />
+        </button>
+        
+        {isOpen && (
+          <div className="absolute left-0 mt-1 w-32 rounded-md shadow-lg bg-white dark:bg-surface-700 ring-1 ring-black ring-opacity-5 z-10">
+            <div className="py-1">
+              {['low', 'medium', 'high', 'critical'].map(priority => (
+                <button
+                  key={priority}
+                  type="button"
+                  onClick={() => {
+                    onSelect(task.Id || task.id, priority);
+                    setIsOpen(false);
+                  }}
+                  className={`block w-full text-left px-4 py-2 text-xs hover:bg-surface-100 dark:hover:bg-surface-600 ${task.priority === priority ? 'bg-surface-100 dark:bg-surface-600 font-medium' : ''}`}
+                >
+                  <span className={`inline-block w-2 h-2 rounded-full mr-2 ${priorityColors[priority].split(' ')[0]}`}></span>
+                  {priority.charAt(0).toUpperCase() + priority.slice(1)}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  };
+  
+  const StatusSelector = ({ task, onSelect }) => {
+    const [isOpen, setIsOpen] = useState(false);
+    
+    const statusColors = {
+      'Not Started': 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200',
+      'In Progress': 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200',
+      'On Hold': 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200',
+      'Completed': 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
+    };
+    
+    return (
+      <div className="relative inline-block text-left">
+        <button 
+          type="button" 
+          onClick={() => setIsOpen(!isOpen)}
+          className={`text-xs px-2 py-1 rounded-full font-medium flex items-center gap-1 ${statusColors[task.status]}`}
+        >
+          {task.status}
+          <ArrowDownIcon className="h-3 w-3" />
+        </button>
+        
+        {isOpen && (
+          <div className="absolute left-0 mt-1 w-36 rounded-md shadow-lg bg-white dark:bg-surface-700 ring-1 ring-black ring-opacity-5 z-10">
+            <div className="py-1">
+              {['Not Started', 'In Progress', 'On Hold', 'Completed'].map(status => (
+                <button
+                  key={status}
+                  type="button"
+                  onClick={() => {
+                    onSelect(task.Id || task.id, status);
+                    setIsOpen(false);
+                  }}
+                  className={`block w-full text-left px-4 py-2 text-xs hover:bg-surface-100 dark:hover:bg-surface-600 ${task.status === status ? 'bg-surface-100 dark:bg-surface-600 font-medium' : ''}`}
+                >
+                  {status}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  };
+
   const InlineEditField = ({ type, name, value, onChange, options = [], className = '', error = null }) => {
     switch (type) {
       case 'text':
@@ -333,20 +443,6 @@ const MainFeature = () => {
     }
   };
 
-  const StatusBadge = ({ status }) => {
-    const bgColors = {
-      'Not Started': 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200',
-      'In Progress': 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200',
-      'On Hold': 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200',
-      'Completed': 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
-    };
-    
-    return (
-      <span className={`text-xs px-2 py-1 rounded-full font-medium ${bgColors[status]}`}>
-        {status}
-      </span>
-    );
-  };
 
   // Handle changing form input
   const handleInputChange = (e, target = 'new') => {
@@ -880,9 +976,17 @@ const MainFeature = () => {
                         <h4 className={`font-bold text-lg ${task.status === 'Completed' ? 'line-through text-surface-500 dark:text-surface-400' : 'text-surface-800 dark:text-surface-50'}`}>
                           {task.title}
                         </h4>
-                        <div className="flex flex-wrap gap-2">
-                          <PriorityBadge priority={task.priority} />
-                          <StatusBadge status={task.status} />
+                        <div className="flex flex-wrap gap-2 items-center">
+                          {/* Inline priority selector */}
+                          <PrioritySelector 
+                            task={task} 
+                            onSelect={handlePriorityChange} 
+                          />
+                          {/* Inline status selector */}
+                          <StatusSelector 
+                            task={task} 
+                            onSelect={handleStatusChange} 
+                          />
                         </div>
                       </div>
                       
@@ -923,8 +1027,7 @@ const MainFeature = () => {
                           <button 
                             onClick={() => handleEditTask(task)}
                             className="p-1.5 text-surface-600 hover:text-surface-800 dark:text-surface-400 dark:hover:text-surface-200 hover:bg-surface-200 dark:hover:bg-surface-700 rounded-full transition-colors"
-                            onClick={() => handleEditTask(task, true)} {/* Pass true for inline editing */}
-                          >
+                            onClick={() => handleEditTask(task, true)}>
                             <EditIcon className="h-4 w-4" />
                           </button>
                           
@@ -947,7 +1050,8 @@ const MainFeature = () => {
         ) : (
           <div>
             <h3 className="text-xl font-bold mb-4 text-surface-800 dark:text-surface-50">Kanban Board</h3>
-            <KanbanBoard tasks={localTasks} onTaskMove={handleTaskMove} onEditTask={handleEditTask} 
+            <KanbanBoard tasks={localTasks} onTaskMove={handleTaskMove} onEditTask={handleEditTask}
+              onPriorityChange={handlePriorityChange}
               onDeleteTask={handleDeleteTask} onStatusChange={handleStatusChange} />
           </div>
         )}

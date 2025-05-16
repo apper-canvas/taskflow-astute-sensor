@@ -243,20 +243,25 @@ export const moveTaskAction = ({ taskId, newStatus }) => async (dispatch) => {
     
     // First fetch the task to get its current data
     const fetchParams = {
-      fields: TASK_FIELDS
+      fields: TASK_FIELDS,
+      where: [
+        {
+          fieldName: "Id",
+          operator: "ExactMatch",
+          values: [taskIdForQuery]
+        }
+      ]
     };
     
     const fetchResponse = await apperClient.fetchRecords(TABLE_NAME, fetchParams);
     
-    if (fetchResponse && fetchResponse.data && fetchResponse.data.length > 0) {
-      const taskToUpdate = fetchResponse.data[0];
-      
-      // Update the task with the new status
-      await dispatch(updateTaskById({...taskToUpdate, status: newStatus}));
-      
-      // Also update the local state for immediate UI feedback
-      dispatch(moveTask({taskId: taskIdForQuery, newStatus}));
+    if (!fetchResponse || !fetchResponse.data || fetchResponse.data.length === 0) {
+      throw new Error("Task not found");
     }
+    
+    const taskToUpdate = fetchResponse.data[0];
+    await dispatch(updateTaskById({...taskToUpdate, status: newStatus}));
+    dispatch(moveTask({taskId: taskIdForQuery, newStatus}));
   } catch (error) {
     console.error("Error moving task:", error);
     dispatch(setError(error.message || "Failed to move task"));

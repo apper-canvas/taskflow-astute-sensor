@@ -3,13 +3,14 @@ import { DragDropContext, Droppable, Draggable } from 'react-beautiful-dnd';
 import { format } from 'date-fns';
 import { getIcon } from '../utils/iconUtils';
 
-const KanbanBoard = ({ tasks, onTaskMove, onEditTask, onDeleteTask, onStatusChange }) => {
+const KanbanBoard = ({ tasks, onTaskMove, onEditTask, onDeleteTask, onStatusChange, onPriorityChange }) => {
   // Get icons as components
   const TrashIcon = getIcon('Trash2');
   const EditIcon = getIcon('Edit');
   const CheckIcon = getIcon('Check');
   const PlayIcon = getIcon('Play');
   const PauseIcon = getIcon('Pause');
+  const ChevronDownIcon = getIcon('ChevronDown');
   
   // Status columns for the kanban board
   const columns = [
@@ -63,6 +64,45 @@ const KanbanBoard = ({ tasks, onTaskMove, onEditTask, onDeleteTask, onStatusChan
     }
   };
   
+  // Priority dropdown component
+  const PriorityDropdown = ({ task, onSelect }) => {
+    const [isOpen, setIsOpen] = useState(false);
+    
+    // Get the appropriate color based on priority
+    const getPriorityColor = (priority) => {
+      switch (priority) {
+        case 'low': return 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200';
+        case 'medium': return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200';
+        case 'high': return 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200';
+        case 'critical': return 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200';
+        default: return 'bg-surface-200 text-surface-800 dark:bg-surface-700 dark:text-surface-200';
+      }
+    };
+    
+    const priorityOptions = [
+      { value: 'low', label: 'Low' },
+      { value: 'medium', label: 'Medium' },
+      { value: 'high', label: 'High' },
+      { value: 'critical', label: 'Critical' }
+    ];
+    
+    return (
+      <div className="relative inline-block text-left z-10" onClick={(e) => e.stopPropagation()}>
+        <button onClick={() => setIsOpen(!isOpen)} className={`flex items-center text-xs px-2 py-1 rounded-full font-medium ${getPriorityColor(task.priority)}`}>
+          <span>{task.priority.charAt(0).toUpperCase() + task.priority.slice(1)}</span>
+          <ChevronDownIcon className="h-3 w-3 ml-1" />
+        </button>
+        {isOpen && (
+          <div className="absolute mt-1 left-0 w-32 rounded-md shadow-lg bg-white dark:bg-surface-700 ring-1 ring-black ring-opacity-5 divide-y divide-surface-200 dark:divide-surface-600 z-20">
+            {priorityOptions.map((option) => (
+              <button key={option.value} onClick={() => { onSelect(task.Id || task.id, option.value); setIsOpen(false); }} className={`block w-full text-left px-4 py-2 text-xs ${option.value === task.priority ? 'bg-surface-100 dark:bg-surface-600 font-medium' : 'hover:bg-surface-50 dark:hover:bg-surface-600'}`}>{option.label}</button>
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  };
+  
   // Generate tasks grouped by status
   const tasksByStatus = getTasksByStatus();
   
@@ -106,12 +146,17 @@ const KanbanBoard = ({ tasks, onTaskMove, onEditTask, onDeleteTask, onStatusChan
                             </p>
                           )}
                           
-                          <div className="flex items-center justify-between mt-3">
-                            <div className="text-xs text-surface-500 dark:text-surface-400">
-                              {task.dueDate && format(new Date(task.dueDate), 'MMM d, yyyy')}
+                          <div className="flex flex-wrap items-center justify-between mt-3 gap-2">
+                            <div className="flex items-center gap-2">
+                              <div className="text-xs text-surface-500 dark:text-surface-400">
+                                {task.dueDate && format(new Date(task.dueDate), 'MMM d, yyyy')}
+                              </div>
+                              <PriorityDropdown 
+                                task={task} 
+                                onSelect={(taskId, priority) => onPriorityChange(taskId, priority)} 
+                              />
                             </div>
-                            
-                            <div className="flex gap-1">
+                            <div className="flex flex-wrap gap-1">
                               {/* Quick action buttons */}
                               {column.id !== 'Completed' && (
                                 <button 
