@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useDispatch, useSelector } from 'react-redux';
 import { format } from 'date-fns';
 import { toast } from 'react-toastify';
-import { fetchTasks, updateTaskById, moveTaskAction } from '../services/taskService';
+import { fetchTasks, updateTaskById, moveTaskAction, createTask, deleteTask } from '../services/taskService';
 import { getIcon } from '../utils/iconUtils';
 import KanbanBoard from './KanbanBoard';
 import { moveTask } from '../store/taskSlice';
