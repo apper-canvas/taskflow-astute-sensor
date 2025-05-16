@@ -3,8 +3,10 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useDispatch, useSelector } from 'react-redux';
 import { format } from 'date-fns';
 import { toast } from 'react-toastify';
+import { fetchTasks, updateTaskById, moveTask as moveTaskAction } from '../services/taskService';
 import { getIcon } from '../utils/iconUtils';
 import KanbanBoard from './KanbanBoard';
+import { moveTask } from '../store/taskSlice';
 
 const MainFeature = () => {
   const dispatch = useDispatch();
@@ -54,6 +56,7 @@ const MainFeature = () => {
 
   // Import from taskService.js
   useEffect(() => {
+    dispatch(fetchTasks());
   }, []);
 
   // Validation function
@@ -165,10 +168,25 @@ const MainFeature = () => {
   };
 
   // Handle changing task status
-  const handleStatusChange = (id, newStatus) => {
-    // Update task status in redux via the proper action
-    dispatch(moveTask({ taskId: id, newStatus }));
-    toast.info(`Task marked as ${newStatus}`);
+  const handleStatusChange = async (id, newStatus) => {
+    try {
+      // Find the task to update
+      const taskToUpdate = localTasks.find(task => task.id === id);
+      
+      if (taskToUpdate) {
+        // Prepare the updated task data
+        const updatedTask = {
+          ...taskToUpdate,
+          status: newStatus
+        };
+        
+        // Update the task using the taskService
+        await dispatch(updateTaskById(updatedTask));
+        toast.info(`Task marked as ${newStatus}`);
+      }
+    } catch (error) {
+      toast.error(error.message || `Failed to update task status to ${newStatus}`);
+    }
   };
   
   // Handle task movement in kanban board
@@ -177,11 +195,12 @@ const MainFeature = () => {
     const taskToUpdate = tasks.find(t => t.id === taskId);
     
     if (taskToUpdate && taskToUpdate.status !== newStatus) {
-      setTasks(prev => 
-        prev.map(task => 
-          task.Id === parseInt(taskId) ? { ...task, status: newStatus, updatedAt: new Date().toISOString() } : task
-        )
-      );
+      // Use the moveTask action from Redux
+      dispatch(moveTask({
+        taskId: parseInt(taskId),
+        newStatus: newStatus
+      }));
+      
       toast.info(`Task moved to ${newStatus}`);
     }
   };
