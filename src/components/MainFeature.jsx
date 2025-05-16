@@ -85,18 +85,13 @@ const MainFeature = () => {
     // Clear previous errors
     setErrors({});
     
-    setIsSubmitting(true);
-    
-    try {
-      // Import createTask from taskService
-      const { createTask } = await import('../services/taskService');
-      
+    try {  
+      setIsSubmitting(true);
+      // Import function from taskService and dispatch it
       await dispatch(createTask(newTask));
-      
-      toast.success('Task added successfully!');
+      toast.success("Task added successfully!");
     } catch (error) {
-      console.error('Error adding task:', error);
-      toast.error(error.message || 'Failed to create task');
+      toast.error(error.message || "Failed to add task");
     } finally {
       setIsSubmitting(false);
       
@@ -139,12 +134,6 @@ const MainFeature = () => {
 
     try {
       setIsSubmitting(true);
-      
-      // Import updateTaskById from taskService
-      const { updateTaskById } = await import('../services/taskService');
-      
-      await dispatch(updateTaskById(editingTask));
-      
       setEditingTask(null);
       toast.success('Task updated successfully!');
     } catch (error) {
@@ -158,7 +147,6 @@ const MainFeature = () => {
   // Handle deleting a task
   const handleDeleteTask = async (taskId) => {
     try {
-      const { deleteTask } = await import('../services/taskService');
       await dispatch(deleteTask(taskId));
       toast.success('Task deleted successfully!');
     } catch (error) {
@@ -179,8 +167,9 @@ const MainFeature = () => {
           ...taskToUpdate,
           status: newStatus
         };
-        
+
         // Update the task using the taskService
+        dispatch(moveTask({ taskId: parseInt(id), newStatus }));
         await dispatch(updateTaskById(updatedTask));
         toast.info(`Task marked as ${newStatus}`);
       }
@@ -192,13 +181,13 @@ const MainFeature = () => {
   // Handle task movement in kanban board
   const handleTaskMove = (taskId, newStatus) => {
     // Find task to update
-    const taskToUpdate = tasks.find(t => t.id === taskId);
+    const taskToUpdate = tasks.find(t => (t.Id || t.id) === parseInt(taskId) || (t.Id || t.id) === taskId);
     
     if (taskToUpdate && taskToUpdate.status !== newStatus) {
-      // Use the moveTask action from Redux
-      dispatch(moveTask({
-        taskId: parseInt(taskId),
-        newStatus: newStatus
+      // Dispatch the moveTaskAction thunk
+      dispatch(moveTaskAction({
+        taskId,
+        newStatus
       }));
       
       toast.info(`Task moved to ${newStatus}`);
@@ -774,7 +763,7 @@ const MainFeature = () => {
                           </button>
                           
                           <button 
-                            onClick={() => handleDeleteTask(task.id)}
+                            onClick={() => handleDeleteTask(task.Id || task.id)}
                             className="p-1.5 text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300 hover:bg-red-100 dark:hover:bg-red-900/30 rounded-full transition-colors"
                             aria-label="Delete task"
                           >

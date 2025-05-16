@@ -4,71 +4,55 @@ import { format } from 'date-fns';
 import { getIcon } from '../utils/iconUtils';
 
 const KanbanBoard = ({ tasks, onTaskMove, onEditTask, onDeleteTask, onStatusChange }) => {
-  // Get icons
-  const EditIcon = getIcon('Edit');
+  // Get icons as components
   const TrashIcon = getIcon('Trash2');
-  const CalendarIcon = getIcon('Calendar');
+  const EditIcon = getIcon('Edit');
+  const CheckIcon = getIcon('Check');
+  const PlayIcon = getIcon('Play');
+  const PauseIcon = getIcon('Pause');
   
-  // State for tracking which task is being dragged
-  const [draggingId, setDraggingId] = useState(null);
-  
-  // Define the columns
+  // Status columns for the kanban board
   const columns = [
-    { id: 'Not Started', name: 'To Do', className: 'column-not-started' },
-    { id: 'In Progress', name: 'In Progress', className: 'column-in-progress' },
-    { id: 'On Hold', name: 'On Hold', className: 'column-on-hold' },
-    { id: 'Completed', name: 'Done', className: 'column-completed' }
+    { id: 'Not Started', title: 'Not Started', className: 'column-not-started' },
+    { id: 'In Progress', title: 'In Progress', className: 'column-in-progress' },
+    { id: 'On Hold', title: 'On Hold', className: 'column-on-hold' },
+    { id: 'Completed', title: 'Completed', className: 'column-completed' }
   ];
   
   // Group tasks by status
   const getTasksByStatus = () => {
-    const grouped = {};
+    const tasksByStatus = {};
     
-    // Initialize all columns (even empty ones)
     columns.forEach(column => {
-      grouped[column.id] = [];
+      tasksByStatus[column.id] = tasks.filter(task => task.status === column.id);
     });
     
-    // Add tasks to their respective columns
-    tasks.forEach(task => {
-      if (grouped[task.status]) {
-        grouped[task.status].push(task);
-      } else {
-        // If status doesn't match any column, add to first column
-        grouped[columns[0].id].push(task);
-      }
-    });
-    
-    return grouped;
+    return tasksByStatus;
   };
   
-  // Handle drag end event
+  // Handle task drag end event
   const handleDragEnd = (result) => {
-    setDraggingId(null);
+    const { source, destination, draggableId } = result;
     
-    const { destination, source, draggableId } = result;
-    
-    // If dropped outside any droppable area
+    // If dropped outside of a droppable area
     if (!destination) return;
     
     // If dropped in the same position
     if (
-      destination.droppableId === source.droppableId &&
-      destination.index === source.index
+      source.droppableId === destination.droppableId &&
+      source.index === destination.index
     ) return;
     
-    // If moved to a different column, update task status
-    if (destination.droppableId !== source.droppableId) {
-      onTaskMove(draggableId, destination.droppableId);
+    // If the status has changed, call the onTaskMove callback
+    if (source.droppableId !== destination.droppableId) {
+      const taskId = draggableId;
+      const newStatus = destination.droppableId;
+      
+      onTaskMove(taskId, newStatus);
     }
   };
   
-  // Handle drag start event
-  const handleDragStart = (start) => {
-    setDraggingId(start.draggableId);
-  };
-  
-  // Get color class based on priority
+  // Get the appropriate priority class for the task
   const getPriorityClass = (priority) => {
     switch (priority) {
       case 'low': return 'task-item-low';
@@ -79,101 +63,83 @@ const KanbanBoard = ({ tasks, onTaskMove, onEditTask, onDeleteTask, onStatusChan
     }
   };
   
-  // Render the priority badge
-  const PriorityBadge = ({ priority }) => {
-    const bgColors = {
-      low: 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200',
-      medium: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200',
-      high: 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200',
-      critical: 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
-    };
-    
-    return (
-      <span className={`text-xs px-2 py-1 rounded-full font-medium ${bgColors[priority]}`}>
-        {priority.charAt(0).toUpperCase() + priority.slice(1)}
-      </span>
-    );
-  };
-  
+  // Generate tasks grouped by status
   const tasksByStatus = getTasksByStatus();
   
   return (
-    <DragDropContext onDragEnd={handleDragEnd} onDragStart={handleDragStart}>
+    <DragDropContext onDragEnd={handleDragEnd}>
       <div className="kanban-container">
         {columns.map(column => (
           <div key={column.id} className={`kanban-column ${column.className}`}>
             <div className="kanban-column-header">
-              <span>{column.name}</span>
-              <span className="kanban-column-badge">{tasksByStatus[column.id].length}</span>
+              <span>{column.title}</span>
+              <span className="kanban-column-badge">{tasksByStatus[column.id]?.length || 0}</span>
             </div>
             
-            {/* 
-              Note: react-beautiful-dnd uses defaultProps which shows a warning in React 18.
-              This is a library limitation and can be ignored until the library is updated.
-              Warning: Connect(Droppable): Support for defaultProps will be removed from memo components
-              in a future major release. Use JavaScript default parameters instead.
-            */}
             <Droppable droppableId={column.id}>
               {(provided, snapshot) => (
                 <div
-                  className={`kanban-task-list ${snapshot.isDraggingOver ? 'bg-surface-200/50 dark:bg-surface-700/30 rounded-lg' : ''}`}
-                  ref={provided?.innerRef}
+                  ref={provided.innerRef}
                   {...provided.droppableProps}
+                  className="kanban-task-list"
                 >
-                  {tasksByStatus[column.id].length === 0 && !snapshot.isDraggingOver && (
-                    <div className="text-center py-4 text-sm text-surface-500 dark:text-surface-400">
-                      No tasks
-                    </div>
-                  )}
-                  
-                  {tasksByStatus[column.id].map((task, index) => (
-                    <Draggable key={task.id} draggableId={task.id} index={index}>
-                      {(dragProvided, dragSnapshot) => (
+                  {tasksByStatus[column.id]?.map((task, index) => (
+                    <Draggable 
+                      key={task.Id || task.id} 
+                      draggableId={task.Id?.toString() || task.id?.toString()} 
+                      index={index}
+                    >
+                      {(provided, snapshot) => (
                         <div
-                          ref={dragProvided?.innerRef}
-                          {...dragProvided.draggableProps}
-                          {...dragProvided.dragHandleProps}
-                          className={`kanban-task-item ${getPriorityClass(task.priority)} ${
-                            snapshot.isDragging ? 'is-dragging' : ''
-                          }`}
+                          ref={provided.innerRef}
+                          {...provided.draggableProps}
+                          {...provided.dragHandleProps}
+                          className={`kanban-task-item ${getPriorityClass(task.priority)} ${snapshot.isDragging ? 'is-dragging' : ''}`}
                         >
-                          <div className="flex flex-col">
-                            <div className="flex justify-between items-start mb-2">
-                              <h4 className="font-bold text-sm text-surface-800 dark:text-surface-50 line-clamp-2">
-                                {task.title}
-                              </h4>
-                              <PriorityBadge priority={task.priority} />
+                          <h4 className="font-medium mb-2 truncate pr-6">
+                            {task.title}
+                          </h4>
+                          
+                          {task.description && (
+                            <p className="text-sm text-surface-600 dark:text-surface-300 line-clamp-2 mb-2">
+                              {task.description}
+                            </p>
+                          )}
+                          
+                          <div className="flex items-center justify-between mt-3">
+                            <div className="text-xs text-surface-500 dark:text-surface-400">
+                              {task.dueDate && format(new Date(task.dueDate), 'MMM d, yyyy')}
                             </div>
                             
-                            {task.description && (
-                              <p className="text-surface-600 dark:text-surface-300 text-sm mb-3 line-clamp-2">
-                                {task.description}
-                              </p>
-                            )}
-                            
-                            <div className="flex justify-between items-center mt-1 text-xs">
-                              <div className="text-surface-500 dark:text-surface-400 flex items-center gap-1">
-                                <CalendarIcon className="h-3 w-3" />
-                                <span>{format(new Date(task.dueDate), 'MMM d')}</span>
-                              </div>
+                            <div className="flex gap-1">
+                              {/* Quick action buttons */}
+                              {column.id !== 'Completed' && (
+                                <button 
+                                  onClick={() => onStatusChange(task.Id || task.id, 'Completed')}
+                                  className="p-1 bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 rounded hover:bg-green-200 dark:hover:bg-green-800"
+                                  title="Mark as completed"
+                                >
+                                  <CheckIcon className="h-3 w-3" />
+                                </button>
+                              )}
                               
-                              <div className="flex gap-1">
+                              {column.id === 'Not Started' && (
                                 <button 
-                                  onClick={() => onEditTask(task)}
-                                  className="p-1 text-surface-600 hover:text-surface-800 dark:text-surface-400 dark:hover:text-surface-200 hover:bg-surface-200 dark:hover:bg-surface-700 rounded transition-colors"
-                                  aria-label="Edit task"
+                                  onClick={() => onStatusChange(task.Id || task.id, 'In Progress')}
+                                  className="p-1 bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 rounded hover:bg-blue-200 dark:hover:bg-blue-800"
+                                  title="Start task"
                                 >
-                                  <EditIcon className="h-3 w-3" />
+                                  <PlayIcon className="h-3 w-3" />
                                 </button>
-                                
-                                <button 
-                                  onClick={() => onDeleteTask(task.id)}
-                                  className="p-1 text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300 hover:bg-red-100 dark:hover:bg-red-900/30 rounded transition-colors"
-                                  aria-label="Delete task"
-                                >
-                                  <TrashIcon className="h-3 w-3" />
-                                </button>
-                              </div>
+                              )}
+                              
+                              <button onClick={() => onEditTask(task)} className="p-1 bg-surface-200 text-surface-600 dark:bg-surface-700 dark:text-surface-300 rounded hover:bg-surface-300 dark:hover:bg-surface-600" title="Edit task">
+                                <EditIcon className="h-3 w-3" />
+                              </button>
+                              
+                              <button onClick={() => onDeleteTask(task.Id || task.id)} className="p-1 bg-red-100 text-red-600 dark:bg-red-900 dark:text-red-300 rounded hover:bg-red-200 dark:hover:bg-red-800" title="Delete task">
+                                <TrashIcon className="h-3 w-3" />
+                              </button>
                             </div>
                           </div>
                         </div>

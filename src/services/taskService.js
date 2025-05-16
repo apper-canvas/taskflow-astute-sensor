@@ -40,6 +40,7 @@ export const fetchTasks = () => async (dispatch) => {
     
     const params = {
       fields: TASK_FIELDS,
+      distinct: true,
       orderBy: [
         {
           field: "dueDate",
@@ -58,9 +59,12 @@ export const fetchTasks = () => async (dispatch) => {
     // Process the response data to ensure it has all required fields for the UI
     const processedTasks = response.data.map(task => ({
       ...task,
-      // Ensure the task has a proper ID field
-      id: task.Id.toString(),
-      // Set defaults for missing fields if needed
+      // Ensure the task has a proper ID field for UI consumption
+      // Keep the original Id for database operations
+      id: task.Id,
+      // We'll use both Id and id in the UI for compatibility
+      // Set defaults for missing fields to avoid UI errors
+      Id: task.Id,
       priority: task.priority || 'medium',
       status: task.status || 'Not Started',
       title: task.title || task.Name || 'Untitled Task'
@@ -107,10 +111,11 @@ export const createTask = (taskData) => async (dispatch) => {
     if (response && response.success && response.results && response.results.length > 0) {
       const createdTask = response.results[0].data;
       
-      // Process the created task to ensure it has all fields needed for UI
+      // Add both id and Id for UI compatibility
       const processedTask = {
         ...createdTask,
-        id: createdTask.Id.toString() // Ensure ID is a string for consistency
+        id: createdTask.Id,
+        title: createdTask.title || createdTask.Name
       };
       
       dispatch(addTask(processedTask));
@@ -140,7 +145,7 @@ export const updateTaskById = (taskData) => async (dispatch) => {
     
     // Prepare task data for update
     const updateData = {
-      Id: taskData.Id,
+      Id: taskData.Id || taskData.id, // Support both id formats
       Name: taskData.title, // Keep Name in sync with title
       title: taskData.title,
       description: taskData.description,
@@ -158,10 +163,10 @@ export const updateTaskById = (taskData) => async (dispatch) => {
     if (response && response.success && response.results && response.results.length > 0) {
       const updatedTask = response.results[0].data;
       
-      // Process the updated task for UI consistency
+      // Process for UI consistency
       const processedTask = {
         ...updatedTask,
-        id: updatedTask.Id.toString()
+        id: updatedTask.Id
       };
       
       dispatch(updateTask(processedTask));
@@ -188,15 +193,19 @@ export const deleteTask = (taskId) => async (dispatch) => {
       apperProjectId: import.meta.env.VITE_APPER_PROJECT_ID,
       apperPublicKey: import.meta.env.VITE_APPER_PUBLIC_KEY
     });
+
+    // Ensure taskId is in the right format
+    const idToDelete = typeof taskId === 'string' && !isNaN(parseInt(taskId)) 
+      ? parseInt(taskId) 
+      : taskId;
     
     const params = {
-      RecordIds: [taskId]
+      RecordIds: [idToDelete]
     };
     
     const response = await apperClient.deleteRecord(TABLE_NAME, params);
     
     if (response && response.success) {
-      dispatch(removeTask(taskId));
       return true;
     } else {
       throw new Error("Failed to delete task");
@@ -204,16 +213,20 @@ export const deleteTask = (taskId) => async (dispatch) => {
   } catch (error) {
     console.error("Error deleting task:", error);
     dispatch(setError(error.message || "Failed to delete task"));
+    return false;
     throw error;
+  } finally {
+    dispatch(removeTask(taskId));
   }
 };
 
 /**
  * Moves a task to a new status in the database
- * @param {number|string} taskId - The ID of the task to move
- * @param {string} newStatus - The new status for the task
+ * @param {Object} params - The parameters object
+ * @param {number|string} params.taskId - The ID of the task to move
+ * @param {string} params.newStatus - The new status for the task
  */
-export const moveTaskAction = (taskId, newStatus) => async (dispatch) => {
+export const moveTaskAction = ({ taskId, newStatus }) => async (dispatch) => {
   try {
     dispatch(setLoading(true));
     
@@ -222,17 +235,15 @@ export const moveTaskAction = (taskId, newStatus) => async (dispatch) => {
       apperProjectId: import.meta.env.VITE_APPER_PROJECT_ID,
       apperPublicKey: import.meta.env.VITE_APPER_PUBLIC_KEY
     });
+
+    // Prepare the ID for database query
+    const taskIdForQuery = typeof taskId === 'string' && !isNaN(parseInt(taskId)) 
+      ? parseInt(taskId) 
+      : taskId;
     
     // First fetch the task to get its current data
     const fetchParams = {
-      fields: TASK_FIELDS,
-      where: [
-        {
-          fieldName: "Id",
-          Operator: "ExactMatch",
-          values: [taskId]
-        }
-      ]
+      fields: TASK_FIELDS
     };
     
     const fetchResponse = await apperClient.fetchRecords(TABLE_NAME, fetchParams);
@@ -244,7 +255,7 @@ export const moveTaskAction = (taskId, newStatus) => async (dispatch) => {
       await dispatch(updateTaskById({...taskToUpdate, status: newStatus}));
       
       // Also update the local state for immediate UI feedback
-      dispatch(moveTask({taskId: parseInt(taskId), newStatus}));
+      dispatch(moveTask({taskId: taskIdForQuery, newStatus}));
     }
   } catch (error) {
     console.error("Error moving task:", error);

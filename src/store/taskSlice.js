@@ -29,7 +29,7 @@ export const taskSlice = createSlice({
       state.error = null;
     },
     updateTask: (state, action) => {
-      const index = state.tasks.findIndex(task => task.Id === action.payload.Id);
+      const index = state.tasks.findIndex(task => (task.Id || task.id) === (action.payload.Id || action.payload.id));
       if (index !== -1) {
         state.tasks[index] = action.payload;
       }
@@ -37,13 +37,13 @@ export const taskSlice = createSlice({
       state.error = null;
     },
     removeTask: (state, action) => {
-      state.tasks = state.tasks.filter(task => task.Id !== action.payload);
+      state.tasks = state.tasks.filter(task => (task.Id || task.id) !== action.payload);
       state.isLoading = false;
       state.error = null;
     },
     moveTask: (state, action) => {
       const { taskId, newStatus } = action.payload;
-      const index = state.tasks.findIndex(task => task.Id === taskId);
+      const index = state.tasks.findIndex(task => (task.Id || task.id) === taskId);
       if (index !== -1) {
         state.tasks[index] = {
           ...state.tasks[index],
