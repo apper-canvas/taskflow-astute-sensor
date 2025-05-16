@@ -210,11 +210,15 @@ const MainFeature = () => {
     const taskToUpdate = tasks.find(t => (t.Id || t.id) === parseInt(taskId) || (t.Id || t.id) === taskId);
     
     if (taskToUpdate && taskToUpdate.status !== newStatus) {
-      // Dispatch the moveTaskAction thunk
-      dispatch(moveTaskAction({
-        taskId,
-        newStatus
-      }));
+      try {
+        // Dispatch the moveTaskAction thunk
+        dispatch(moveTaskAction({
+          taskId: parseInt(taskId) || taskId,
+          newStatus
+        }));
+      } catch (error) {
+        toast.error("Failed to move task: " + error.message);
+      }
       
       toast.info(`Task moved to ${newStatus}`);
     }

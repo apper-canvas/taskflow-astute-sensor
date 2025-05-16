@@ -232,10 +232,14 @@ export const moveTaskAction = ({ taskId, newStatus }) => async (dispatch, getSta
   
   try {
     // Get the task from current Redux state before any updates
-    const state = getState();
-    task = state.tasks.tasks.find(t => (t.Id || t.id) === taskId);
+    // Ensure consistent ID handling
+    const normalizedTaskId = isNaN(taskId) ? taskId : Number(taskId);
     
-    if (!task) throw new Error("Task not found in current state");
+    const state = getState();
+    // Search for the task with various ID formats
+    task = state.tasks.tasks.find(t => 
+      (t.Id === normalizedTaskId) || (t.id === normalizedTaskId) || (String(t.Id) === String(taskId)) || (String(t.id) === String(taskId)));
+    
     
     // Step 1: Immediately update Redux state to provide responsive UI
     dispatch(moveTask({ taskId, newStatus }));
@@ -247,6 +251,10 @@ export const moveTaskAction = ({ taskId, newStatus }) => async (dispatch, getSta
       apperPublicKey: import.meta.env.VITE_APPER_PUBLIC_KEY
     });
     
+    // If task wasn't found, try to continue with just the ID
+    if (!task) {
+      task = { Id: normalizedTaskId, id: normalizedTaskId };
+    }
     // Prepare update data - only include the fields we're changing
     const updateData = {
       Id: task.Id || task.id,
