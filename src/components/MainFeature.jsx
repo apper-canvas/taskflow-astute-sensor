@@ -1,11 +1,16 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useDispatch, useSelector } from 'react-redux';
 import { format } from 'date-fns';
 import { toast } from 'react-toastify';
 import { getIcon } from '../utils/iconUtils';
 import KanbanBoard from './KanbanBoard';
 
 const MainFeature = () => {
+  const dispatch = useDispatch();
+  const { tasks, isLoading: tasksLoading } = useSelector(state => state.tasks);
+  const { isAuthenticated } = useSelector(state => state.user);
+  
   // Get icons as components
   const PlusIcon = getIcon('Plus');
   const TrashIcon = getIcon('Trash2');
@@ -19,16 +24,12 @@ const MainFeature = () => {
   const LayoutIcon = getIcon('Layout');
   const ListIcon = getIcon('List');
   const LayoutKanbanIcon = getIcon('Trello');
-
-  // Loading saved tasks from localStorage
-  const getSavedTasks = () => {
-    const saved = localStorage.getItem('tasks');
-    return saved ? JSON.parse(saved) : [];
-  };
+  const LoaderIcon = getIcon('Loader');
 
   // State for tasks
-  const [tasks, setTasks] = useState(getSavedTasks);
-  const [newTask, setNewTask] = useState({
+  const [localTasks, setLocalTasks] = useState([]);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [newTask, setNewTask] = useState({ 
     title: '',
     description: '',
     priority: 'medium',
@@ -43,11 +44,17 @@ const MainFeature = () => {
 
   // Handle validation errors
   const [errors, setErrors] = useState({});
-
-  // Save tasks to localStorage when they change
+  
+  // Update local tasks when Redux tasks change
   useEffect(() => {
-    localStorage.setItem('tasks', JSON.stringify(tasks));
+    if (tasks && tasks.length > 0) {
+      setLocalTasks(tasks);
+    }
   }, [tasks]);
+
+  // Import from taskService.js
+  useEffect(() => {
+  }, []);
 
   // Validation function
   const validateTask = (task) => {
@@ -61,8 +68,9 @@ const MainFeature = () => {
     return errors;
   };
 
-  // Handle adding new task
-  const handleAddTask = (e) => {
+  // Handle adding new task with database
+  const handleAddTask = async (e) => {
+    e.preventDefault();
     e.preventDefault();
     
     // Validate form
@@ -75,13 +83,27 @@ const MainFeature = () => {
     // Clear previous errors
     setErrors({});
     
-    const task = {
-      ...newTask,
-      id: Date.now().toString(),
-      createdAt: new Date().toISOString(),
-    };
+    setIsSubmitting(true);
     
-    setTasks(prev => [...prev, task]);
+    try {
+      // Import createTask from taskService
+      const { createTask } = await import('../services/taskService');
+      
+      await dispatch(createTask(newTask));
+      
+      toast.success('Task added successfully!');
+    } catch (error) {
+      console.error('Error adding task:', error);
+      toast.error(error.message || 'Failed to create task');
+    } finally {
+      setIsSubmitting(false);
+      
+      // Reset form regardless of success/failure
+      resetForm();
+    }
+  };
+  
+  const resetForm = () => {
     setNewTask({
       title: '',
       description: '',
@@ -89,25 +111,28 @@ const MainFeature = () => {
       dueDate: format(new Date(), 'yyyy-MM-dd'),
       status: 'Not Started'
     });
-    
-    toast.success('Task added successfully!');
   };
 
-  // Handle deleting a task
-  const handleDeleteTask = (id) => {
-    setTasks(prev => prev.filter(task => task.id !== id));
-    toast.success('Task deleted successfully!');
-  };
-
-  // Handle editing a task
-  const handleEditTask = (task) => {
-    setEditingTask({
-      ...task
+    try {
+      setIsSubmitting(true);
+      
+      // Import updateTaskById from taskService
+      const { updateTaskById } = await import('../services/taskService');
+      
+      await dispatch(updateTaskById(editingTask));
+      
+      setEditingTask(null);
+      toast.success('Task updated successfully!');
+    } catch (error) {
+      console.error('Error updating task:', error);
+      toast.error(error.message || 'Failed to update task');
+    } finally {
+      setIsSubmitting(false);
+    }
     });
   };
-
-  // Handle updating a task
-  const handleUpdateTask = (e) => {
+  // Handle updating a task with database
+  const handleUpdateTask = async (e) => {
     e.preventDefault();
     
     // Validate form
@@ -148,7 +173,7 @@ const MainFeature = () => {
     if (taskToUpdate && taskToUpdate.status !== newStatus) {
       setTasks(prev => 
         prev.map(task => 
-          task.id === taskId ? { ...task, status: newStatus, updatedAt: new Date().toISOString() } : task
+          task.Id === parseInt(taskId) ? { ...task, status: newStatus, updatedAt: new Date().toISOString() } : task
         )
       );
       toast.info(`Task moved to ${newStatus}`);
@@ -157,7 +182,7 @@ const MainFeature = () => {
   
   // Filter tasks based on the selected filter
   const getFilteredTasks = () => {
-    let filtered = [...tasks];
+    let filtered = [...localTasks];
     
     // Apply filter
     if (filter !== 'all') {
@@ -249,8 +274,8 @@ const MainFeature = () => {
 
   // Get completion statistics
   const getCompletionStats = () => {
-    const total = tasks.length;
-    const completed = tasks.filter(task => task.status === 'Completed').length;
+    const total = localTasks.length;
+    const completed = localTasks.filter(task => task.status === 'Completed').length;
     const percentage = total > 0 ? Math.round((completed / total) * 100) : 0;
     
     return {
@@ -269,6 +294,9 @@ const MainFeature = () => {
         <h2 className="text-2xl md:text-3xl font-bold mb-4 text-surface-800 dark:text-surface-50">Task Manager</h2>
         
         {/* View Toggle */}
+        {tasksLoading && (
+          <div className="flex justify-center my-8"><LoaderIcon className="w-12 h-12 animate-spin text-primary" /></div>
+        )}
         <div className="flex justify-end mb-4">
           <div className="inline-flex rounded-md shadow-sm" role="group">
             <button
@@ -293,9 +321,6 @@ const MainFeature = () => {
             </button>
           </div>
         </div>
-        
-      <div className="mb-6">
-        <h2 className="text-2xl md:text-3xl font-bold mb-4 text-surface-800 dark:text-surface-50">Task Manager</h2>
         
         {/* Task Statistics */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
@@ -339,113 +364,127 @@ const MainFeature = () => {
         <form onSubmit={handleAddTask} className="mb-8 card">
           <h3 className="text-xl font-bold mb-4 text-surface-800 dark:text-surface-50">Add New Task</h3>
           
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-            <div>
-              <label htmlFor="title" className="block text-sm font-medium mb-1 text-surface-700 dark:text-surface-300">
-                Task Title *
-              </label>
-              <input
-                type="text"
-                id="title"
-                name="title"
-                value={newTask.title}
-                onChange={(e) => handleInputChange(e)}
-                className={`input ${errors.title ? 'border-red-500 dark:border-red-500' : ''}`}
-                placeholder="Enter task title"
-              />
-              {errors.title && (
-                <p className="mt-1 text-sm text-red-500 flex items-center">
-                  <AlertCircleIcon className="h-4 w-4 mr-1" />
-                  {errors.title}
-                </p>
-              )}
-            </div>
-            
-            <div>
-              <label htmlFor="dueDate" className="block text-sm font-medium mb-1 text-surface-700 dark:text-surface-300">
-                Due Date *
-              </label>
-              <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <CalendarIcon className="h-5 w-5 text-surface-400" />
+          {isAuthenticated ? (
+            <>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                <div>
+                  <label htmlFor="title" className="block text-sm font-medium mb-1 text-surface-700 dark:text-surface-300">
+                    Task Title *
+                  </label>
+                  <input
+                    type="text"
+                    id="title"
+                    name="title"
+                    value={newTask.title}
+                    onChange={(e) => handleInputChange(e)}
+                    className={`input ${errors.title ? 'border-red-500 dark:border-red-500' : ''}`}
+                    placeholder="Enter task title"
+                    disabled={isSubmitting}
+                  />
+                  {errors.title && (
+                    <p className="mt-1 text-sm text-red-500 flex items-center">
+                      <AlertCircleIcon className="h-4 w-4 mr-1" />
+                      {errors.title}
+                    </p>
+                  )}
                 </div>
-                <input
-                  type="date"
-                  id="dueDate"
-                  name="dueDate"
-                  value={newTask.dueDate}
-                  onChange={(e) => handleInputChange(e)}
-                  className={`input pl-10 ${errors.dueDate ? 'border-red-500 dark:border-red-500' : ''}`}
-                />
+                
+                <div>
+                  <label htmlFor="dueDate" className="block text-sm font-medium mb-1 text-surface-700 dark:text-surface-300">
+                    Due Date *
+                  </label>
+                  <div className="relative">
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                      <CalendarIcon className="h-5 w-5 text-surface-400" />
+                    </div>
+                    <input
+                      type="date"
+                      id="dueDate"
+                      name="dueDate"
+                      value={newTask.dueDate}
+                      onChange={(e) => handleInputChange(e)}
+                      className={`input pl-10 ${errors.dueDate ? 'border-red-500 dark:border-red-500' : ''}`}
+                      disabled={isSubmitting}
+                    />
+                  </div>
+                  {errors.dueDate && (
+                    <p className="mt-1 text-sm text-red-500 flex items-center">
+                      <AlertCircleIcon className="h-4 w-4 mr-1" />
+                      {errors.dueDate}
+                    </p>
+                  )}
+                </div>
               </div>
-              {errors.dueDate && (
-                <p className="mt-1 text-sm text-red-500 flex items-center">
-                  <AlertCircleIcon className="h-4 w-4 mr-1" />
-                  {errors.dueDate}
-                </p>
-              )}
-            </div>
-          </div>
-          
-          <div className="mb-4">
-            <label htmlFor="description" className="block text-sm font-medium mb-1 text-surface-700 dark:text-surface-300">
-              Description
-            </label>
-            <textarea
-              id="description"
-              name="description"
-              value={newTask.description}
-              onChange={(e) => handleInputChange(e)}
-              className="input min-h-[80px]"
-              placeholder="Enter task description"
-            ></textarea>
-          </div>
-          
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-            <div>
-              <label htmlFor="priority" className="block text-sm font-medium mb-1 text-surface-700 dark:text-surface-300">
-                Priority
-              </label>
-              <select
-                id="priority"
-                name="priority"
-                value={newTask.priority}
-                onChange={(e) => handleInputChange(e)}
-                className="input"
+              
+              <div className="mb-4">
+                <label htmlFor="description" className="block text-sm font-medium mb-1 text-surface-700 dark:text-surface-300">
+                  Description
+                </label>
+                <textarea
+                  id="description"
+                  name="description"
+                  value={newTask.description}
+                  onChange={(e) => handleInputChange(e)}
+                  className="input min-h-[80px]"
+                  placeholder="Enter task description"
+                  disabled={isSubmitting}
+                ></textarea>
+              </div>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                <div>
+                  <label htmlFor="priority" className="block text-sm font-medium mb-1 text-surface-700 dark:text-surface-300">
+                    Priority
+                  </label>
+                  <select
+                    id="priority"
+                    name="priority"
+                    value={newTask.priority}
+                    onChange={(e) => handleInputChange(e)}
+                    className="input"
+                    disabled={isSubmitting}
+                  >
+                    <option value="low">Low</option>
+                    <option value="medium">Medium</option>
+                    <option value="high">High</option>
+                    <option value="critical">Critical</option>
+                  </select>
+                </div>
+                
+                <div>
+                  <label htmlFor="status" className="block text-sm font-medium mb-1 text-surface-700 dark:text-surface-300">
+                    Status
+                  </label>
+                  <select
+                    id="status"
+                    name="status"
+                    value={newTask.status}
+                    onChange={(e) => handleInputChange(e)}
+                    className="input"
+                    disabled={isSubmitting}
+                  >
+                    <option value="Not Started">Not Started</option>
+                    <option value="In Progress">In Progress</option>
+                    <option value="On Hold">On Hold</option>
+                    <option value="Completed">Completed</option>
+                  </select>
+                </div>
+              </div>
+              
+              <button 
+                type="submit" 
+                className="btn btn-primary w-full sm:w-auto flex items-center justify-center gap-2"
+                disabled={isSubmitting}
               >
-                <option value="low">Low</option>
-                <option value="medium">Medium</option>
-                <option value="high">High</option>
-                <option value="critical">Critical</option>
-              </select>
+                {isSubmitting ? <LoaderIcon className="h-5 w-5 animate-spin" /> : <PlusIcon className="h-5 w-5" />}
+                <span>{isSubmitting ? 'Adding...' : 'Add Task'}</span>
+              </button>
+            </>
+          ) : (
+            <div className="text-center py-4 text-surface-600 dark:text-surface-400">
+              Please log in to add tasks.
             </div>
-            
-            <div>
-              <label htmlFor="status" className="block text-sm font-medium mb-1 text-surface-700 dark:text-surface-300">
-                Status
-              </label>
-              <select
-                id="status"
-                name="status"
-                value={newTask.status}
-                onChange={(e) => handleInputChange(e)}
-                className="input"
-              >
-                <option value="Not Started">Not Started</option>
-                <option value="In Progress">In Progress</option>
-                <option value="On Hold">On Hold</option>
-                <option value="Completed">Completed</option>
-              </select>
-            </div>
-          </div>
-          
-          <button 
-            type="submit" 
-            className="btn btn-primary w-full sm:w-auto flex items-center justify-center gap-2"
-          >
-            <PlusIcon className="h-5 w-5" />
-            <span>Add Task</span>
-          </button>
+          )}
         </form>
         
         {/* Task List Container */}
@@ -728,7 +767,7 @@ const MainFeature = () => {
         ) : (
           <div>
             <h3 className="text-xl font-bold mb-4 text-surface-800 dark:text-surface-50">Kanban Board</h3>
-            <KanbanBoard tasks={tasks} onTaskMove={handleTaskMove} onEditTask={handleEditTask} 
+            <KanbanBoard tasks={localTasks} onTaskMove={handleTaskMove} onEditTask={handleEditTask} 
               onDeleteTask={handleDeleteTask} onStatusChange={handleStatusChange} />
           </div>
         )}

@@ -1,7 +1,10 @@
 import * as Icons from 'lucide-react';
 
-export const getIcon = (iconName) => {
-  return (Icons[iconName] && typeof Icons[iconName] === 'function') 
-    ? Icons[iconName] 
-    : Icons.Smile;
+/**
+ * Get icon component by name from lucide-react
+ * @param {string} name - Icon name in PascalCase
+ * @returns {React.Component} Icon component
+ */
+export const getIcon = (name) => {
+  return Icons[name] || Icons.HelpCircle;
 };

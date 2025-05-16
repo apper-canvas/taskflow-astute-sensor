@@ -1,19 +1,24 @@
 import { useState, useEffect } from 'react';
+import { useDispatch, useSelector } from 'react-redux';
 import { motion } from 'framer-motion';
 import MainFeature from '../components/MainFeature';
 import { getIcon } from '../utils/iconUtils';
+import { fetchTasks } from '../services/taskService';
 
 const Home = () => {
+  const dispatch = useDispatch();
   const [isLoading, setIsLoading] = useState(true);
+  const { isAuthenticated } = useSelector(state => state.user);
   
   useEffect(() => {
-    // Simulate loading
-    const timer = setTimeout(() => {
+    // Load tasks from database
+    const loadData = async () => {
+      await dispatch(fetchTasks());
       setIsLoading(false);
-    }, 1000);
-    
-    return () => clearTimeout(timer);
-  }, []);
+    };
+
+    loadData();
+  }, [dispatch]);
   
   // Get icons as components
   const CheckListIcon = getIcon('CheckSquare');
@@ -65,7 +70,7 @@ const Home = () => {
               >
                 <CheckListIcon className="h-7 w-7 md:h-8 md:w-8" />
               </motion.div>
-              <h1 className="text-2xl md:text-3xl font-bold tracking-tight">TaskFlow</h1>
+              <h1 className="text-2xl md:text-3xl font-bold tracking-tight">TaskFlow {isAuthenticated ? ' - Logged In' : ''}</h1>
             </div>
           </div>
         </div>
