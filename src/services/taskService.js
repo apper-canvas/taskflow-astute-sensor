@@ -214,8 +214,8 @@ export const deleteTask = (taskId) => async (dispatch) => {
     console.error("Error deleting task:", error);
     dispatch(setError(error.message || "Failed to delete task"));
     return false;
-    throw error;
   } finally {
+    // Remove task from Redux store regardless of API success/failure
     dispatch(removeTask(taskId));
   }
 };
@@ -227,14 +227,15 @@ export const deleteTask = (taskId) => async (dispatch) => {
  * @param {string} params.newStatus - The new status for the task
  */
 export const moveTaskAction = ({ taskId, newStatus }) => async (dispatch, getState) => {
+  // Declare task variable outside try block so it's accessible in catch block
+  let task = null;
+  
   try {
     // Get the task from current Redux state before any updates
     const state = getState();
-    const task = state.tasks.tasks.find(t => (t.Id || t.id) === taskId);
+    task = state.tasks.tasks.find(t => (t.Id || t.id) === taskId);
     
-    if (!task) {
-      throw new Error("Task not found in current state");
-    }
+    if (!task) throw new Error("Task not found in current state");
     
     // Step 1: Immediately update Redux state to provide responsive UI
     dispatch(moveTask({ taskId, newStatus }));
